@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+    <setting label="30001" type="text" id="username" default=""/>
+    <setting label="30002" type="text" id="password" option="hidden"  enable="!eq(-1,)" default=""/>
+    <setting id="send_errors" type="bool" label="30025" default="false" />
+</settings>

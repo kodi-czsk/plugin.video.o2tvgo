@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<strings>
+    <string id="30001">Username</string>
+    <string id="30002">Password</string>
+    <string id="30003">Invalid login</string>
+	<string id="30025">Report errors</string>
+	
+	<string id="30500">Error ocurred during runtime.</string>
+	<string id="30501">Allow reporting of errors?</string>
+	<string id="30502">Error was sent to be repaired</string>
+	<string id="30503">Failure report could not be sent</string>
+</strings>

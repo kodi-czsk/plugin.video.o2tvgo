@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<strings>
+    <string id="30001">Uživatelské jméno</string>
+    <string id="30002">Heslo</string>
+    <string id="30003">Neplatné přihlášení</string>
+	<string id="30025">Odesílat chyby</string>
+
+	<string id="30500">Nastala chyba při běhu aplikace.</string>
+	<string id="30501">Povolit odesílní chyb doplňku?</string>
+	<string id="30502">Chyba byla odeslána k opravě</string>
+	<string id="30503">Report o chybě se nepodařilo odeslat</string>
+</strings>
