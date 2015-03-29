@@ -10,7 +10,7 @@ import json
 
 __author__ = "Štěpán Ort"
 __license__ = "MIT"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __email__ = "stepanort@gmail.com"
 
 
@@ -121,7 +121,8 @@ class O2TVGO:
             for item in items:
                 channel_key = _toString(item['channelKey'])
                 name = _toString(item['name'])
-                logo_url = "http://www.o2tv.cz" + item['logoUrl']
+                if 'logoUrl' in item.keys():
+                    logo_url = "http://www.o2tv.cz" + item['logoUrl']
                 weight = item['weight']
                 live = item['live']
                 if live:
