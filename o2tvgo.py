@@ -4,19 +4,24 @@
 """Wrapper pro iVysílání České televize
 """
 
+import xbmc
+
 import httplib
 import urllib
 import json
+import requests
+from uuid import getnode as get_mac
 
 __author__ = "Štěpán Ort"
 __license__ = "MIT"
-__version__ = "1.0.1"
+__version__ = "1.1.3"
 __email__ = "stepanort@gmail.com"
 
 
-_COMMON_HEADERS = { "X-Nangu-App-Version" : "Android#1.1.1",
+_COMMON_HEADERS = { "X-Nangu-App-Version" : "Android#1.2.9",
                     "X-Nangu-Device-Name" : "Nexus 7",
-                    "User-Agent" : "Dalvik/1.6.0 (Linux; U; Android 4.4.4; Nexus 7 Build/KTU84P)",
+                    "User-Agent" : "Dalvik/2.1.0 (Linux; U; Android 5.1.1; Nexus 7 Build/LMY47V)",
+                    "Accept-Encoding": "gzip",
                     "Connection" : "Keep-Alive" }
 
 def _toString(text):
@@ -26,37 +31,40 @@ def _toString(text):
         output = str(text)
     return output
 
+def _deviceId():
+    mac = get_mac()
+    hexed = hex((mac*7919)%(2**64))
+    return ('0000000000000000'+hexed[2:-1])[16:]
+
 # Kanál
 class LiveChannel:
-    
+
     def __init__(self, o2tv, channel_key, name, logo_url, weight):
         self._o2tv = o2tv
         self.channel_key = channel_key
         self.name = name
-        self.logo_url = logo_url
         self.weight = weight
+        self.logo_url = logo_url
 
     def url(self):
         if not self._o2tv.access_token:
             self._o2tv.refresh_access_token()
         access_token = self._o2tv.access_token
+        if not self._o2tv.subscription_code:
+            self._o2tv.refresh_configuration()
+        subscription_code = self._o2tv.subscription_code
         playlist = None
         while access_token:
-            device_id = "a47efefe07c2173c"
             params = {"serviceType":"LIVE_TV",
-              "subscriptionCode":"100195978",
+              "subscriptionCode":subscription_code,
               "channelKey": self.channel_key,
               "deviceType":"TABLET",
               "streamingProtocol":"HLS"}
             headers = _COMMON_HEADERS;
-            headers["Cookie"] = "access_token=" + access_token + ";deviceId=" + device_id
-            conn = httplib.HTTPConnection("app.o2tv.cz")
-            body = urllib.urlencode(params)
-            url = "/sws/server/streaming/uris.json" + "?" + body
-            conn.request(method="GET", url=url, headers=headers)
-            resp = conn.getresponse()
-            data = resp.read()
-            jsonData = json.loads(data)
+            cookies = { "access_token": access_token, "deviceId": self._o2tv.device_id }
+            req = requests.get('http://app.o2tv.cz/sws/server/streaming/uris.json', params=params, headers=headers, cookies=cookies)
+            jsonData = req.json()
+            xbmc.log(json.dumps(_toString(jsonData), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
             access_token = None
             if 'statusMessage' in jsonData:
                 status = jsonData['statusMessage']
@@ -72,35 +80,33 @@ class AuthenticationError(BaseException):
     pass
 
 class O2TVGO:
-    
+
     def __init__(self, username, password):
         self.username = username
         self.password = password
         self._live_channels = {}
         self.access_token = None
-    
+        self.subscription_code = None
+        self.offer = None
+        self.device_id = _deviceId() #"a47efefe07c2173c"
+
     def refresh_access_token(self):
         if not self.username or not self.password:
             raise AuthenticationError()
-        conn = httplib.HTTPSConnection("oauth.nangu.tv")
-        headers = {}
-
+        headers = _COMMON_HEADERS
         headers["Content-Type"] = "application/x-www-form-urlencoded;charset=UTF-8"
-        
-        params = {'grant_type' : 'password',
+        data = {  'grant_type' : 'password',
                   'client_id' : 'tef-web-portal-etnetera',
                   'client_secret' : '2b16ac9984cd60dd0154f779ef200679',
                   'username' : self.username,
                   'password' : self.password,
                   'platform_id' : '231a7d6678d00c65f6f3b2aaa699a0d0',
                   'language' : 'cs'}
-
-        body = urllib.urlencode(params)
-        conn.request("POST", "/oauth/token", body, headers)
-        resp = conn.getresponse()
-        data = resp.read()
-        j = json.loads(data)
+        req = requests.post('https://oauth.nangu.tv/oauth/token', data=data, headers=headers, verify=False)
+        j = req.json()
+        xbmc.log(json.dumps(_toString(j), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
         if 'error' in j:
+            xbmc.log(_toString(j), level=xbmc.LOGERROR)
             error = j['error']
             if error == 'authentication-failed':
                 raise AuthenticationError()
@@ -109,22 +115,74 @@ class O2TVGO:
         self.access_token = j["access_token"]
         self.expires_in = j["expires_in"]
         return self.access_token
-    
+
+    def refresh_configuration(self):
+        if not self.access_token:
+            self.refresh_access_token()
+        access_token = self.access_token
+        headers = _COMMON_HEADERS
+        cookies = { "access_token": access_token, "deviceId": self.device_id }
+        req = requests.get('http://app.o2tv.cz/sws/subscription/settings/subscription-configuration.json', headers=headers, cookies=cookies)
+        j = req.json()
+        xbmc.log(json.dumps(_toString(j), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
+        self.subscription_code = _toString(j["subscription"])
+        self.offer = j["billingParams"]["offers"]
+        self.tariff = j["billingParams"]["tariff"]
+
     def live_channels(self):
+        if not self.access_token:
+            self.refresh_access_token()
+        access_token = self.access_token
+        if not self.offer:
+            self.refresh_configuration()
+        offer = self.offer
+        if not self.tariff:
+            self.refresh_configuration()
+        tariff = self.tariff
         if len(self._live_channels) == 0:
-            conn = httplib.HTTPSConnection('www.o2tv.cz')
-            conn.request(method="GET", url='/mobile/tv/channels-all.json', headers=_COMMON_HEADERS)
-            resp = conn.getresponse()
-            json_string = resp.read()
-            j = json.loads(json_string);
-            items = j['channelsAll']['items']
-            for item in items:
-                channel_key = _toString(item['channelKey'])
-                name = _toString(item['name'])
-                if 'logoUrl' in item.keys():
-                    logo_url = "http://www.o2tv.cz" + item['logoUrl']
-                weight = item['weight']
-                live = item['live']
-                if live:
-                    self._live_channels[channel_key] = LiveChannel(self, channel_key, name, logo_url, weight)
+            headers = _COMMON_HEADERS
+            cookies = { "access_token": access_token, "deviceId": self.device_id }
+            params = { "locality":"DEFAULT",
+                "tariff": tariff,
+                "isp": "1",
+                "language": "ces",
+                "deviceType": "MOBILE",
+                "liveTvStreamingProtocol":"HLS",
+                "offer": offer}
+            req = requests.get('http://app.o2tv.cz/sws/server/tv/channels.json', params=params, headers=headers, cookies=cookies)
+            j = req.json();
+            xbmc.log(json.dumps(_toString(j), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
+            purchased_channels = j['purchasedChannels']
+            items = j['channels']
+            for channel_id, item in items.iteritems():
+                if channel_id in purchased_channels:
+                    live = item['liveTvPlayable']
+                    if live:
+                        channel_key = _toString(item['channelKey'])
+                        logo = _toString(item['logo'])
+                        name = _toString(item['channelName'])
+                        weight = item['weight']
+                        self._live_channels[channel_key] = LiveChannel(self, channel_key, name, logo, weight)
+            done = False
+            offset = 0
+            while not done:
+                headers = _COMMON_HEADERS
+                params = { "language": "ces",
+                    "audience": "over_18",
+                    "channelKey": self._live_channels.keys(),
+                    "limit": 30,
+                    "offset": offset}
+                req = requests.get('http://www.o2tv.cz/mobile/tv/channels.json', params=params, headers=headers)
+                j = req.json()
+                items = j['channels']['items']
+                for item in items:
+                    item = item['channel']
+                    channel_key = _toString(item['channelKey'])
+                    if 'logoUrl' in item.keys():
+                        logo_url = "http://www.o2tv.cz" + item['logoUrl']
+                        self._live_channels[channel_key].logo_url = logo_url
+                offset += 30
+                total_count = j['channels']['totalCount']
+                if offset >= total_count:
+                    done = True
         return self._live_channels
