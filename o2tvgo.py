@@ -4,17 +4,14 @@
 """Wrapper pro iVysílání České televize
 """
 
-import xbmc
-
 import httplib
 import urllib
 import json
 import requests
-from uuid import getnode as get_mac
 
 __author__ = "Štěpán Ort"
 __license__ = "MIT"
-__version__ = "1.1.3"
+__version__ = "1.1.4"
 __email__ = "stepanort@gmail.com"
 
 
@@ -30,11 +27,6 @@ def _toString(text):
     else:
         output = str(text)
     return output
-
-def _deviceId():
-    mac = get_mac()
-    hexed = hex((mac*7919)%(2**64))
-    return ('0000000000000000'+hexed[2:-1])[16:]
 
 # Kanál
 class LiveChannel:
@@ -60,11 +52,10 @@ class LiveChannel:
               "channelKey": self.channel_key,
               "deviceType":"TABLET",
               "streamingProtocol":"HLS"}
-            headers = _COMMON_HEADERS;
+            headers = _COMMON_HEADERS
             cookies = { "access_token": access_token, "deviceId": self._o2tv.device_id }
             req = requests.get('http://app.o2tv.cz/sws/server/streaming/uris.json', params=params, headers=headers, cookies=cookies)
             jsonData = req.json()
-            xbmc.log(json.dumps(_toString(jsonData), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
             access_token = None
             if 'statusMessage' in jsonData:
                 status = jsonData['statusMessage']
@@ -79,16 +70,19 @@ class LiveChannel:
 class AuthenticationError(BaseException):
     pass
 
+class TooManyDevicesError(BaseException):
+    pass
+
 class O2TVGO:
 
-    def __init__(self, username, password):
+    def __init__(self, device_id, username, password):
         self.username = username
         self.password = password
         self._live_channels = {}
         self.access_token = None
         self.subscription_code = None
         self.offer = None
-        self.device_id = _deviceId() #"a47efefe07c2173c"
+        self.device_id = device_id
 
     def refresh_access_token(self):
         if not self.username or not self.password:
@@ -104,9 +98,7 @@ class O2TVGO:
                   'language' : 'cs'}
         req = requests.post('https://oauth.nangu.tv/oauth/token', data=data, headers=headers, verify=False)
         j = req.json()
-        xbmc.log(json.dumps(_toString(j), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
         if 'error' in j:
-            xbmc.log(_toString(j), level=xbmc.LOGERROR)
             error = j['error']
             if error == 'authentication-failed':
                 raise AuthenticationError()
@@ -124,7 +116,13 @@ class O2TVGO:
         cookies = { "access_token": access_token, "deviceId": self.device_id }
         req = requests.get('http://app.o2tv.cz/sws/subscription/settings/subscription-configuration.json', headers=headers, cookies=cookies)
         j = req.json()
-        xbmc.log(json.dumps(_toString(j), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
+        if 'errorMessage' in j:
+            errorMessage = j['errorMessage']
+            statusMessage = j['statusMessage']
+            if statusMessage == 'unauthorized-device':
+                raise TooManyDevicesError()
+            else:
+                raise Exception(error)
         self.subscription_code = _toString(j["subscription"])
         self.offer = j["billingParams"]["offers"]
         self.tariff = j["billingParams"]["tariff"]
@@ -150,8 +148,7 @@ class O2TVGO:
                 "liveTvStreamingProtocol":"HLS",
                 "offer": offer}
             req = requests.get('http://app.o2tv.cz/sws/server/tv/channels.json', params=params, headers=headers, cookies=cookies)
-            j = req.json();
-            xbmc.log(json.dumps(_toString(j), sort_keys=True, indent=4 * ' '), level=xbmc.LOGERROR)
+            j = req.json()
             purchased_channels = j['purchasedChannels']
             items = j['channels']
             for channel_id, item in items.iteritems():

@@ -9,8 +9,11 @@ import httplib
 from urlparse import urlparse
 import json
 import traceback
+import random
+from uuid import getnode as get_mac
 from o2tvgo import O2TVGO
 from o2tvgo import AuthenticationError
+from o2tvgo import TooManyDevicesError
 
 params = False
 try:
@@ -27,7 +30,15 @@ try:
             sys.exit(1)
     ###############################################################################
     _addon_ = xbmcaddon.Addon('plugin.video.o2tvgo')
-    
+
+    def _deviceId():
+        mac = get_mac()
+        hexed = hex((mac*7919)%(2**64))
+        return ('0000000000000000'+hexed[2:-1])[16:]
+
+    def _randomHex16():
+        return ''.join([random.choice('0123456789abcdef') for x in range(16)])
+
     # First run
     if not (_addon_.getSetting("settings_init_done") == 'true'):
         DEFAULT_SETTING_VALUES = { 'send_errors' : 'false' }
@@ -36,7 +47,20 @@ try:
             if not val:
                 _addon_.setSetting(setting, DEFAULT_SETTING_VALUES[setting])
         _addon_.setSetting("settings_init_done", "true")
-    
+
+    _device_id_ = _addon_.getSetting("device_id")
+    if not _device_id_:
+        first_device_id = _deviceId()
+        second_device_id = _deviceId()
+        if first_device_id == second_device_id:
+            _device_id_ = first_device_id
+        else:
+            if _device_name_:
+                _device_id_ = _fromDeviceId()
+            else:
+                _device_id_ = _randomHex16()
+        _addon_.setSetting("device_id", _device_id_)
+
     ###############################################################################
     _profile_ = xbmc.translatePath(_addon_.getAddonInfo('profile'))
     _lang_   = _addon_.getLocalizedString
@@ -49,21 +73,21 @@ try:
     _icon_ = xbmc.translatePath( os.path.join(_addon_.getAddonInfo('path'), 'icon.png' ) )
     _handle_ = int(sys.argv[1])
     _baseurl_ = sys.argv[0]
-    
-    _o2tvgo_ = O2TVGO(_username_, _password_) 
+
+    _o2tvgo_ = O2TVGO(_device_id_, _username_, _password_)
     ###############################################################################
     def log(msg, level=xbmc.LOGDEBUG):
         if type(msg).__name__=='unicode':
             msg = msg.encode('utf-8')
         xbmc.log("[%s] %s"%(_scriptname_,msg.__str__()), level)
-    
+
     def logDbg(msg):
         log(msg,level=xbmc.LOGDEBUG)
-    
+
     def logErr(msg):
         log(msg,level=xbmc.LOGERROR)
     ###############################################################################
-    
+
     def _fetchChannels():
         global _o2tvgo_
         channels = None
@@ -78,8 +102,12 @@ try:
                 d = xbmcgui.Dialog()
                 d.notification(_scriptname_, _lang_(30003), xbmcgui.NOTIFICATION_ERROR)
                 _reload_settings()
+            except TooManyDevicesError:
+                d = xbmcgui.Dialog()
+                d.notification(_scriptname_, _lang_(30006), xbmcgui.NOTIFICATION_ERROR)
+                return None
         return channels
-    
+
     def _fetchChannel(channel_key):
         link = None
         ex = False
@@ -100,7 +128,7 @@ try:
                 d.notification(_scriptname_, _lang_(30003), xbmcgui.NOTIFICATION_ERROR)
                 _reload_settings()
         return link, channel
-    
+
     def _reload_settings():
         _addon_.openSettings()
         global _first_error_
@@ -112,8 +140,8 @@ try:
         global _password_
         _password_ = _addon_.getSetting("password")
         global _o2tvgo_
-        _o2tvgo_ = O2TVGO(_username_, _password_)
-    
+        _o2tvgo_ = O2TVGO(_device_id_, _username_, _password_)
+
     def channelListing():
         channels = _fetchChannels()
         if not channels:
@@ -122,7 +150,7 @@ try:
         for channel in channels_sorted:
             addDirectoryItem(channel.name, _baseurl_+ "?play=" + urllib.quote_plus(channel.channel_key), image=channel.logo_url, isFolder=False)
         xbmcplugin.endOfDirectory(_handle_, updateListing=False)
-   
+
     def playChannel(channel_key):
         r = _fetchChannel(channel_key)
         if not r:
@@ -134,7 +162,7 @@ try:
         li.setThumbnailImage(channel.logo_url)
         xbmc.PlayList(1).add(link, li)
         xbmc.Player().play(pl)
-   
+
     def addDirectoryItem(label, url, plot=None, title=None, date=None, icon=_icon_, image=None, fanart=None, isFolder=True):
         li = xbmcgui.ListItem(label)
         if not title:
@@ -145,14 +173,14 @@ try:
         li.setIconImage(icon)
         li.setInfo("video", liVideo)
         xbmcplugin.addDirectoryItem(handle=_handle_, url=url, listitem=li, isFolder=isFolder)
-    
+
     def _toString(text):
         if type(text).__name__=='unicode':
             output = text.encode('utf-8')
         else:
             output = str(text)
         return output
-    
+
     def _sendError(params, exc_type, exc_value, exc_traceback):
         try:
             conn = httplib.HTTPSConnection('script.google.com')
@@ -177,7 +205,7 @@ try:
         except:
             pass
         return False
-    
+
     def get_params():
             param=[]
             paramstring=sys.argv[2]
@@ -193,7 +221,7 @@ try:
                             splitparams=pairsofparams[i].split('=')
                             if (len(splitparams))==2:
                                     param[splitparams[0]]=splitparams[1]
-            return param             
+            return param
 
     def assign_params(params):
         for param in params:
@@ -201,11 +229,11 @@ try:
                 globals()[param]=urllib.unquote_plus(params[param])
             except:
                 pass
-    
+
     play=None
     params=get_params()
     assign_params(params)
-    
+
     if play:
         playChannel(_toString(play))
     else:
