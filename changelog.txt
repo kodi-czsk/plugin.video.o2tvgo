@@ -1,3 +1,6 @@
+2015-10-30 [1.1.5]
+* Error variable fix
+* Sending version of plugin to remote error log
 2015-08-18 [1.1.4]
 * Device ID saved to settings
 2015-08-17 [1.1.3]

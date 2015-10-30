@@ -67,6 +67,7 @@ try:
     _scriptname_ = _addon_.getAddonInfo('name')
     _first_error_ = (_addon_.getSetting('first_error') == "true")
     _send_errors_ = (_addon_.getSetting('send_errors') == "true")
+    _version_ = _addon_.getAddonInfo('version')
     _username_ = _addon_.getSetting("username")
     _password_ = _addon_.getSetting("password")
     _format_ = 'video/' + _addon_.getSetting('format').lower()
@@ -182,9 +183,10 @@ try:
         return output
 
     def _sendError(params, exc_type, exc_value, exc_traceback):
+        status = "no status"
         try:
             conn = httplib.HTTPSConnection('script.google.com')
-            req_data = urllib.urlencode({ 'addon' : _scriptname_, 'params' : _toString(params), 'type' : exc_type, 'value' : exc_value, 'traceback' : _toString(traceback.format_exception(exc_type, exc_value, exc_traceback))})
+            req_data = urllib.urlencode({ 'addon' : _scriptname_, 'version' : _version_, 'params' : _toString(params), 'type' : exc_type, 'value' : exc_value, 'traceback' : _toString(traceback.format_exception(exc_type, exc_value, exc_traceback))})
             headers = {"Content-type": "application/x-www-form-urlencoded"}
             conn.request(method='POST', url='/macros/s/AKfycbyZfKhi7A_6QurtOhcan9t1W0Tug-F63_CBUwtfkBkZbR2ysFvt/exec', body=req_data, headers=headers)
             resp = conn.getresponse()
@@ -202,8 +204,11 @@ try:
                 status = json_body['status']
                 if status == 'ok':
                     return True
+                else:
+                    logErr(status)
         except:
             pass
+        logErr(status)
         return False
 
     def get_params():

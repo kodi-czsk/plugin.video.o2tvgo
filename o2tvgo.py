@@ -122,7 +122,7 @@ class O2TVGO:
             if statusMessage == 'unauthorized-device':
                 raise TooManyDevicesError()
             else:
-                raise Exception(error)
+                raise Exception(errorMessage)
         self.subscription_code = _toString(j["subscription"])
         self.offer = j["billingParams"]["offers"]
         self.tariff = j["billingParams"]["tariff"]
