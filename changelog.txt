@@ -1,3 +1,6 @@
+2015-11-13 [1.1.6]
+* Locality fetched from subscription configuration
+* Temporary no broadcast fix
 2015-10-30 [1.1.5]
 * Error variable fix
 * Sending version of plugin to remote error log

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Wrapper pro iVysílání České televize
+"""Wrapper pro O2TV Go
 """
 
 import httplib
@@ -11,7 +11,7 @@ import requests
 
 __author__ = "Štěpán Ort"
 __license__ = "MIT"
-__version__ = "1.1.4"
+__version__ = "1.1.6"
 __email__ = "stepanort@gmail.com"
 
 
@@ -61,11 +61,16 @@ class LiveChannel:
                 status = jsonData['statusMessage']
                 if status == 'bad-credentials':
                     access_token = self._o2tv.refresh_access_token()
+                elif status == 'channel.not-found':
+                    raise ChannelIsNotBroadcastingError()
                 else:
                     raise Exception(status)
             else:
                 playlist = jsonData["uris"][0]["uri"]
         return playlist
+
+class ChannelIsNotBroadcastingError(BaseException):
+    pass
 
 class AuthenticationError(BaseException):
     pass
@@ -81,6 +86,7 @@ class O2TVGO:
         self._live_channels = {}
         self.access_token = None
         self.subscription_code = None
+        self.locality = None
         self.offer = None
         self.device_id = device_id
 
@@ -126,6 +132,7 @@ class O2TVGO:
         self.subscription_code = _toString(j["subscription"])
         self.offer = j["billingParams"]["offers"]
         self.tariff = j["billingParams"]["tariff"]
+        self.locality = j["locality"]
 
     def live_channels(self):
         if not self.access_token:
@@ -137,10 +144,13 @@ class O2TVGO:
         if not self.tariff:
             self.refresh_configuration()
         tariff = self.tariff
+        if not self.locality:
+            self.refresh_configuration()
+        locality = self.locality
         if len(self._live_channels) == 0:
             headers = _COMMON_HEADERS
             cookies = { "access_token": access_token, "deviceId": self.device_id }
-            params = { "locality":"DEFAULT",
+            params = { "locality": locality,
                 "tariff": tariff,
                 "isp": "1",
                 "language": "ces",
@@ -156,7 +166,7 @@ class O2TVGO:
                     live = item['liveTvPlayable']
                     if live:
                         channel_key = _toString(item['channelKey'])
-                        logo = _toString(item['logo'])
+                        logo = 'http://app.o2tv.cz' + _toString(item['logo'])
                         name = _toString(item['channelName'])
                         weight = item['weight']
                         self._live_channels[channel_key] = LiveChannel(self, channel_key, name, logo, weight)

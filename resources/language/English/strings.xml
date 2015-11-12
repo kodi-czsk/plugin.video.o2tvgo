@@ -6,6 +6,7 @@
     <string id="30004">Device name</string>
     <string id="30005">Device ID</string>
     <string id="30006">Too many devices paired with this account</string>
+	<string id="30007">Channel is not broadcasting</string>
 
   	<string id="30025">Report errors</string>
 

@@ -14,6 +14,7 @@ from uuid import getnode as get_mac
 from o2tvgo import O2TVGO
 from o2tvgo import AuthenticationError
 from o2tvgo import TooManyDevicesError
+from o2tvgo import ChannelIsNotBroadcastingError
 
 params = False
 try:
@@ -23,6 +24,7 @@ try:
     if REMOTE_DBG:
         try:
             sys.path.append(os.environ['HOME']+r'/.xbmc/system/python/Lib/pysrc')
+            sys.path.append(os.environ['APPDATA']+r'/Kodi/system/python/Lib/pysrc')
             import pydevd
             pydevd.settrace('localhost', port=5678, stdoutToServer=True, stderrToServer=True)
         except ImportError:
@@ -128,6 +130,10 @@ try:
                 d = xbmcgui.Dialog()
                 d.notification(_scriptname_, _lang_(30003), xbmcgui.NOTIFICATION_ERROR)
                 _reload_settings()
+            except ChannelIsNotBroadcastingError:
+                d = xbmcgui.Dialog()
+                d.notification(_scriptname_, _lang_(30007), xbmcgui.NOTIFICATION_INFO)
+                return
         return link, channel
 
     def _reload_settings():
