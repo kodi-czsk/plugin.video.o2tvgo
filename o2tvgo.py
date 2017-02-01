@@ -102,7 +102,7 @@ class O2TVGO:
                   'password' : self.password,
                   'platform_id' : '231a7d6678d00c65f6f3b2aaa699a0d0',
                   'language' : 'cs'}
-        req = requests.post('https://oauth.nangu.tv/oauth/token', data=data, headers=headers, verify=False)
+        req = requests.post('https://oauth.o2tv.cz/oauth/token', data=data, headers=headers, verify=False)
         j = req.json()
         if 'error' in j:
             error = j['error']
