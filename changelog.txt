@@ -1,3 +1,5 @@
+2017-02-02 [1.1.7]
+* OAuth error fix. Thx to Freaders
 2015-11-13 [1.1.6]
 * Locality fetched from subscription configuration
 * Temporary no broadcast fix

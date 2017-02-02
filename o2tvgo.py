@@ -11,7 +11,7 @@ import requests
 
 __author__ = "Štěpán Ort"
 __license__ = "MIT"
-__version__ = "1.1.6"
+__version__ = "1.1.7"
 __email__ = "stepanort@gmail.com"
 
 
